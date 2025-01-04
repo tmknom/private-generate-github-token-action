@@ -1,23 +1,152 @@
-name: Rename me
+name: Private Generate GitHub Token
 description: |
-  Template repository for creating Composite Action with GitHub Actions.
+  This action generates an installation access token using GitHub Apps for GitHub Actions.
+  It retrieves credentials for GitHub Apps from HCP Vault Secrets.
+  Parameters for accessing HCP Vault Secrets are extracted from the labels of private images stored in the GitHub Container Registry.
+  This approach simplifies credential management across repositories and automates the generation of GitHub Apps tokens.
 
   ## Usage
 
-  Write usage for your Composite Action.
-
   ```yaml
     steps:
-      - name: Template
-        uses: tmknom/template-composite-action@v0
+      - name: Private Generate GitHub Token
+        uses: tmknom/private-generate-github-token-action@v0
+        with:
+          repositories: foo-repo
   ```
+
+inputs:
+  repositories:
+    required: false
+    description: List of repositories to install the GitHub App on.
+
+outputs:
+  token:
+    value: ${{ steps.app.outputs.token }}
+    description: GitHub installation access token.
 
 runs:
   using: composite
 
   steps:
-    - name: Run
-      shell: bash
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ github.token }}
+
+    - name: Pull secrets image
+      id: pull
+      env:
+        IMAGE: ghcr.io/tmknom/internal-secrets/hcp:latest
       run: |
         set -x
-        echo "Write steps"
+        docker pull "${IMAGE}"
+        echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+      shell: bash
+
+    - name: Describe encrypted secrets
+      id: encrypted
+      env:
+        IMAGE: ${{ steps.pull.outputs.image }}
+      run: |
+        labels="$(docker inspect "${IMAGE}" | jq -c '.[0].Config.Labels')"
+        echo "::add-mask::${labels}"
+
+        project_id="$(jq -r '.project_id' <<<"${labels}")"
+        echo "::add-mask::${project_id}"
+        echo "project-id=${project_id}" >> "${GITHUB_OUTPUT}"
+
+        service_account="$(jq -r '.service_account' <<<"${labels}")"
+        echo "::add-mask::${service_account}"
+        echo "service-account=${service_account}" >> "${GITHUB_OUTPUT}"
+
+        secrets_app="$(jq -r '.secrets_app' <<<"${labels}")"
+        echo "::add-mask::${secrets_app}"
+        echo "secrets-app=${secrets_app}" >> "${GITHUB_OUTPUT}"
+      shell: bash
+
+    - name: Decrypt HCP Project ID
+      id: hcp-project-id
+      uses: tmknom/symmetric-encrypt-decrypt-action@7b99754b4745d076fee506388900124b777880d3 # v0.1.2
+      with:
+        data: ${{ steps.encrypted.outputs.project-id }}
+        key: key-hcp-project-id-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        iv: iv-hcp-project-id-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        operation: decrypt
+
+    - name: Decrypt HCP Service Account
+      id: hcp-service-account
+      uses: tmknom/symmetric-encrypt-decrypt-action@7b99754b4745d076fee506388900124b777880d3 # v0.1.2
+      with:
+        data: ${{ steps.encrypted.outputs.service-account }}
+        key: key-hcp-service-account-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        iv: iv-hcp-service-account-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        operation: decrypt
+
+    - name: Decrypt HCP Secrets App
+      id: hcp-secrets-app
+      uses: tmknom/symmetric-encrypt-decrypt-action@7b99754b4745d076fee506388900124b777880d3 # v0.1.2
+      with:
+        data: ${{ steps.encrypted.outputs.secrets-app }}
+        key: key-hcp-secrets-app-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        iv: iv-hcp-secrets-app-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        operation: decrypt
+
+    - name: Generate HCP workload identity provider
+      id: hcp
+      env:
+        PROJECT_ID: ${{ steps.hcp-project-id.outputs.result }}
+        SERVICE_ACCOUNT: ${{ steps.hcp-service-account.outputs.result }}
+        SECRETS_APP: ${{ steps.hcp-secrets-app.outputs.result }}
+      run: |
+        provider="iam/project/${PROJECT_ID}/service-principal/${SERVICE_ACCOUNT}/workload-identity-provider/${SECRETS_APP}"
+        echo "::add-mask::${provider}"
+        echo "provider=${provider}" >> "${GITHUB_OUTPUT}"
+      shell: bash
+
+    - name: Authenticate to HCP
+      uses: hashicorp/hcp-auth-action@b11d0bff4bbe76283448ddca08a4a4e93c5ed4b9 # v0.1.0
+      with:
+        workload_identity_provider: ${{ steps.hcp.outputs.provider }}
+        audience: ${{ github.repository }}:${{ github.repository_id }}
+
+    - name: Download hcp CLI
+      uses: hashicorp/hcp-setup-action@fa6934c14c661dfbe9b6cf9c47ddb41759d625aa # v0.1.0
+      with:
+        version: latest
+
+    - name: Describe GitHub Apps credentials
+      id: credentials
+      env:
+        SECRETS_APP: ${{ steps.hcp-secrets-app.outputs.result }}
+      run: |
+        secrets=(hcp vault-secrets secrets open --app "${SECRETS_APP}" --format=json)
+        PR_WRITER_APP_ID="$("${secrets[@]}" PR_WRITER_APP_ID | jq -r '.static_version.value')"
+        echo "::add-mask::${PR_WRITER_APP_ID}"
+        echo "app-id=${PR_WRITER_APP_ID}" >> "${GITHUB_OUTPUT}"
+
+        key_file="${RUNNER_TEMP}/private.key"
+        "${secrets[@]}" PR_WRITER_APP_PRIVATE_KEY | jq -r '.static_version.value' > "${key_file}"
+        echo "app-private-key-file=${key_file}" >> "${GITHUB_OUTPUT}"
+      shell: bash
+
+    - name: Generate GitHub Token
+      id: app
+      uses: tmknom/generate-github-token-action@e0f9098bfea71c5b68642fcbd1c2e690932856b1 # v0.1.0
+      with:
+        app-id: ${{ steps.credentials.outputs.app-id }}
+        app-private-key-file: ${{ steps.credentials.outputs.app-private-key-file }}
+        repositories: ${{inputs.repositories }}
+
+    - name: Remove credentials
+      env:
+        APP_PRIVATE_KEY_FILE: ${{ steps.credentials.outputs.app-private-key-file }}
+        IMAGE: ${{ steps.pull.outputs.image }}
+      run: |
+        set -x
+        rm "${APP_PRIVATE_KEY_FILE}" || true
+        rm "${GHA_HCP_CRED_FILE}" || true
+        docker rmi "${IMAGE}" || true
+      shell: bash
