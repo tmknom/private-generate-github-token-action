@@ -1,36 +1,49 @@
-# template-composite-action
+# private-generate-github-token-action
 
-Template repository for Composite Action.
+Generate an installation access token for personal use.
+
+> [!IMPORTANT]
+> This action is designed for personal use only. Please refrain from using it in your projects.
 
 <!-- actdocs start -->
 
 ## Description
 
-Template repository for creating Composite Action with GitHub Actions.
+This action generates an installation access token using GitHub Apps for GitHub Actions.
+It retrieves credentials for GitHub Apps from HCP Vault Secrets.
+Parameters for accessing HCP Vault Secrets are extracted from the labels of private images stored in the GitHub Container Registry.
+This approach simplifies credential management across repositories and automates the generation of GitHub Apps tokens.
 
 ## Usage
 
-Write usage for your Composite Action.
-
 ```yaml
   steps:
-    - name: Template
-      uses: tmknom/template-composite-action@v0
+    - name: Private Generate GitHub Token
+      uses: tmknom/private-generate-github-token-action@v0
+      with:
+        repositories: foo-repo
 ```
 
 ## Inputs
 
-N/A
+| Name | Description | Default | Required |
+| :--- | :---------- | :------ | :------: |
+| repositories | List of repositories to install the GitHub App on. | n/a | no |
 
 ## Outputs
 
-N/A
+| Name | Description |
+| :--- | :---------- |
+| token | GitHub installation access token. |
 
 <!-- actdocs end -->
 
 ## Permissions
 
-N/A
+| Scope    | Access |
+| :------- | :----- |
+| packages | read   |
+| id-token | write  |
 
 ## FAQ
 
@@ -44,4 +57,4 @@ N/A
 
 See [GitHub Releases][releases].
 
-[releases]: https://github.com/tmknom/template-composite-action/releases
+[releases]: https://github.com/tmknom/private-generate-github-token-action/releases
