@@ -19,6 +19,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    environment: ${{ github.actor_id != github.repository_owner_id && 'required-approval' || '' }}
     permissions:
       contents: read
       packages: read
