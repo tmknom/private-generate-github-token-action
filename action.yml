@@ -18,7 +18,7 @@ description: |
 inputs:
   repositories:
     required: false
-    description: List of repositories to install the GitHub App on.
+    description: A space-separated list of repositories to install the GitHub App on.
 
 outputs:
   token:

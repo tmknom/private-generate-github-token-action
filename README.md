@@ -28,7 +28,7 @@ This approach simplifies credential management across repositories and automates
 
 | Name | Description | Default | Required |
 | :--- | :---------- | :------ | :------: |
-| repositories | List of repositories to install the GitHub App on. | n/a | no |
+| repositories | A space-separated list of repositories to install the GitHub App on. | n/a | no |
 
 ## Outputs
 
