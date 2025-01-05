@@ -134,7 +134,7 @@ runs:
 
     - name: Generate GitHub Token
       id: app
-      uses: tmknom/generate-github-token-action@e0f9098bfea71c5b68642fcbd1c2e690932856b1 # v0.1.0
+      uses: tmknom/generate-github-token-action@913d0a8de78bb41ef9fb2f14497204a054bd7c4a # v0.2.0
       with:
         app-id: ${{ steps.credentials.outputs.app-id }}
         app-private-key-file: ${{ steps.credentials.outputs.app-private-key-file }}
