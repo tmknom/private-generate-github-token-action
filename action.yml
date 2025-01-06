@@ -39,11 +39,13 @@ runs:
     - name: Pull secrets image
       id: pull
       env:
-        IMAGE: ghcr.io/tmknom/internal-secrets/hcp:latest
+        IMAGE_DIGEST: sha256:7b08a12a2c43534a127657498f05f903850f3ccb4ffa91ffe33d1f7054c1b7c1
+        IMAGE_NAME: ghcr.io/tmknom/internal-secrets/hcp
       run: |
         set -x
-        docker pull "${IMAGE}"
-        echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+        image="${IMAGE_NAME}@${IMAGE_DIGEST}"
+        docker pull "${image}"
+        echo "image=${image}" >> "${GITHUB_OUTPUT}"
       shell: bash
 
     - name: Describe encrypted secrets
@@ -58,9 +60,9 @@ runs:
         echo "::add-mask::${project_id}"
         echo "project-id=${project_id}" >> "${GITHUB_OUTPUT}"
 
-        service_account="$(jq -r '.service_account' <<<"${labels}")"
-        echo "::add-mask::${service_account}"
-        echo "service-account=${service_account}" >> "${GITHUB_OUTPUT}"
+        service_principal="$(jq -r '.service_principal' <<<"${labels}")"
+        echo "::add-mask::${service_principal}"
+        echo "service-principal=${service_principal}" >> "${GITHUB_OUTPUT}"
 
         secrets_app="$(jq -r '.secrets_app' <<<"${labels}")"
         echo "::add-mask::${secrets_app}"
@@ -76,13 +78,13 @@ runs:
         iv: iv-hcp-project-id-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
 
-    - name: Decrypt HCP Service Account
-      id: hcp-service-account
+    - name: Decrypt HCP Service Principal
+      id: hcp-service-principal
       uses: tmknom/symmetric-encrypt-decrypt-action@7b99754b4745d076fee506388900124b777880d3 # v0.1.2
       with:
-        data: ${{ steps.encrypted.outputs.service-account }}
-        key: key-hcp-service-account-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
-        iv: iv-hcp-service-account-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        data: ${{ steps.encrypted.outputs.service-principal }}
+        key: key-hcp-service-principal-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        iv: iv-hcp-service-principal-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
 
     - name: Decrypt HCP Secrets App
@@ -98,10 +100,10 @@ runs:
       id: hcp
       env:
         PROJECT_ID: ${{ steps.hcp-project-id.outputs.result }}
-        SERVICE_ACCOUNT: ${{ steps.hcp-service-account.outputs.result }}
+        SERVICE_PRINCIPAL: ${{ steps.hcp-service-principal.outputs.result }}
         SECRETS_APP: ${{ steps.hcp-secrets-app.outputs.result }}
       run: |
-        provider="iam/project/${PROJECT_ID}/service-principal/${SERVICE_ACCOUNT}/workload-identity-provider/${SECRETS_APP}"
+        provider="iam/project/${PROJECT_ID}/service-principal/${SERVICE_PRINCIPAL}/workload-identity-provider/${SECRETS_APP}"
         echo "::add-mask::${provider}"
         echo "provider=${provider}" >> "${GITHUB_OUTPUT}"
       shell: bash
