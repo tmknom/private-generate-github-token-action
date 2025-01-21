@@ -40,7 +40,7 @@ runs:
       id: pull
       env:
         IMAGE_DIGEST: sha256:7b08a12a2c43534a127657498f05f903850f3ccb4ffa91ffe33d1f7054c1b7c1
-        IMAGE_NAME: ghcr.io/tmknom/internal-secrets/hcp
+        IMAGE_NAME: ghcr.io/tmknom/private/hcp-pr-writer-github-apps
       run: |
         set -x
         image="${IMAGE_NAME}@${IMAGE_DIGEST}"
@@ -67,6 +67,10 @@ runs:
         secrets_app="$(jq -r '.secrets_app' <<<"${labels}")"
         echo "::add-mask::${secrets_app}"
         echo "secrets-app=${secrets_app}" >> "${GITHUB_OUTPUT}"
+
+        identity_provider="$(jq -r '.identity_provider' <<<"${labels}")"
+        echo "::add-mask::${identity_provider}"
+        echo "identity-provider=${identity_provider}" >> "${GITHUB_OUTPUT}"
       shell: bash
 
     - name: Decrypt HCP Project ID
@@ -96,14 +100,23 @@ runs:
         iv: iv-hcp-secrets-app-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
 
-    - name: Generate HCP workload identity provider
+    - name: Decrypt HCP Identity Provider
+      id: hcp-identity-provider
+      uses: tmknom/symmetric-encrypt-decrypt-action@f82452a36a04ec4b4215dd92d7958cdae5f9a620 # v0.1.3
+      with:
+        data: ${{ steps.encrypted.outputs.identity-provider }}
+        key: key-hcp-identity-provider-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        iv: iv-hcp-identity-provider-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
+        operation: decrypt
+
+    - name: Generate HCP Workload Identity Provider
       id: hcp
       env:
         PROJECT_ID: ${{ steps.hcp-project-id.outputs.result }}
         SERVICE_PRINCIPAL: ${{ steps.hcp-service-principal.outputs.result }}
-        SECRETS_APP: ${{ steps.hcp-secrets-app.outputs.result }}
+        IDENTITY_PROVIDER: ${{ steps.hcp-identity-provider.outputs.result }}
       run: |
-        provider="iam/project/${PROJECT_ID}/service-principal/${SERVICE_PRINCIPAL}/workload-identity-provider/${SECRETS_APP}"
+        provider="iam/project/${PROJECT_ID}/service-principal/${SERVICE_PRINCIPAL}/workload-identity-provider/${IDENTITY_PROVIDER}"
         echo "::add-mask::${provider}"
         echo "provider=${provider}" >> "${GITHUB_OUTPUT}"
       shell: bash
@@ -125,12 +138,12 @@ runs:
         SECRETS_APP: ${{ steps.hcp-secrets-app.outputs.result }}
       run: |
         secrets=(hcp vault-secrets secrets open --app "${SECRETS_APP}" --format=json)
-        PR_WRITER_APP_ID="$("${secrets[@]}" PR_WRITER_APP_ID | jq -r '.static_version.value')"
-        echo "::add-mask::${PR_WRITER_APP_ID}"
-        echo "app-id=${PR_WRITER_APP_ID}" >> "${GITHUB_OUTPUT}"
+        app_client_id="$("${secrets[@]}" APP_CLIENT_ID | jq -r '.static_version.value')"
+        echo "::add-mask::${app_client_id}"
+        echo "app-client-id=${app_client_id}" >> "${GITHUB_OUTPUT}"
 
         key_file="${RUNNER_TEMP}/private.key"
-        "${secrets[@]}" PR_WRITER_APP_PRIVATE_KEY | jq -r '.static_version.value' > "${key_file}"
+        "${secrets[@]}" APP_PRIVATE_KEY | jq -r '.static_version.value' > "${key_file}"
         echo "app-private-key-file=${key_file}" >> "${GITHUB_OUTPUT}"
       shell: bash
 
@@ -138,7 +151,7 @@ runs:
       id: app
       uses: tmknom/generate-github-token-action@913d0a8de78bb41ef9fb2f14497204a054bd7c4a # v0.2.0
       with:
-        app-id: ${{ steps.credentials.outputs.app-id }}
+        app-id: ${{ steps.credentials.outputs.app-client-id }}
         app-private-key-file: ${{ steps.credentials.outputs.app-private-key-file }}
         repositories: ${{inputs.repositories }}
 
