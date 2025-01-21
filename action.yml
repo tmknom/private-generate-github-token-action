@@ -39,7 +39,7 @@ runs:
     - name: Pull secrets image
       id: pull
       env:
-        IMAGE_DIGEST: sha256:7b08a12a2c43534a127657498f05f903850f3ccb4ffa91ffe33d1f7054c1b7c1
+        IMAGE_DIGEST: sha256:b7baff567708b82ca3095a423b4988c8c1f223f1532809299d08449e13672d89
         IMAGE_NAME: ghcr.io/tmknom/private/hcp-pr-writer-github-apps
       run: |
         set -x
