@@ -36,7 +36,7 @@ runs:
         username: ${{ github.repository_owner }}
         password: ${{ github.token }}
 
-    - name: Pull secrets image
+    - name: Pull private image
       id: pull
       env:
         IMAGE_DIGEST: sha256:57cf766974ee447826dadc5431df568650230fb978dc0bfd6687bb0aa77cf282
@@ -46,6 +46,24 @@ runs:
         image="${IMAGE_NAME}@${IMAGE_DIGEST}"
         docker pull "${image}"
         echo "image=${image}" >> "${GITHUB_OUTPUT}"
+      shell: bash
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+    - name: Verify private image
+      env:
+        IMAGE: ${{ steps.pull.outputs.image }}
+        SIGNER_DIGEST: 0e543c37599ff5377d0d38d84e89f29d75d97be6
+        WORKFLOW_SHA: dbec7773f262e71f5b307fdabbe96ec139631dec
+      run: |
+        set -x
+        cosign verify \
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+          --certificate-identity "https://github.com/tmknom/internal-secrets/.github/workflows/reusable-release.yml@${SIGNER_DIGEST}" \
+          --certificate-github-workflow-repository "tmknom/internal-secrets" \
+          --certificate-github-workflow-sha "${WORKFLOW_SHA}" \
+          "${IMAGE}" 2>/dev/null | jq .
       shell: bash
 
     - name: Retrieve encrypted secrets
