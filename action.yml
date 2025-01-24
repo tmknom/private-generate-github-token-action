@@ -39,7 +39,7 @@ runs:
     - name: Pull private image
       id: pull
       env:
-        IMAGE_DIGEST: sha256:57cf766974ee447826dadc5431df568650230fb978dc0bfd6687bb0aa77cf282
+        IMAGE_DIGEST: sha256:4d7e0d0f3377e0cdb7bcc69e295afb4cd6010d3ce05837a25343eff86b25bc62
         IMAGE_NAME: ghcr.io/tmknom/private/hcp-pr-writer-github-apps
       run: |
         set -x
@@ -54,8 +54,8 @@ runs:
     - name: Verify private image
       env:
         IMAGE: ${{ steps.pull.outputs.image }}
-        SIGNER_DIGEST: 0e543c37599ff5377d0d38d84e89f29d75d97be6
-        WORKFLOW_SHA: dbec7773f262e71f5b307fdabbe96ec139631dec
+        SIGNER_DIGEST: 8be6d94ee2dd0366c306f5d5150cda436dabba26
+        WORKFLOW_SHA: 96ea426b6da217350bdcb18133728d581b58be83
       run: |
         set -x
         cosign verify \
