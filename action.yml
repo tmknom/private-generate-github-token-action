@@ -39,7 +39,7 @@ runs:
     - name: Pull private image
       id: pull
       env:
-        IMAGE_DIGEST: sha256:4d7e0d0f3377e0cdb7bcc69e295afb4cd6010d3ce05837a25343eff86b25bc62
+        IMAGE_DIGEST: sha256:4ee7ca53fdb8af1d95e47270c0d75b9134abf38e4c0ee48b9f1acdec872933e2
         IMAGE_NAME: ghcr.io/tmknom/private/hcp-pr-writer-github-apps
       run: |
         set -x
@@ -54,8 +54,8 @@ runs:
     - name: Verify private image
       env:
         IMAGE: ${{ steps.pull.outputs.image }}
-        SIGNER_DIGEST: 8be6d94ee2dd0366c306f5d5150cda436dabba26
-        WORKFLOW_SHA: 96ea426b6da217350bdcb18133728d581b58be83
+        SIGNER_DIGEST: 19e65d5650e0a5121af5bb5824d45665969df259
+        WORKFLOW_SHA: 6f4078603a1b618f26caf9f5d015aad71a0d4a70
       run: |
         set -x
         cosign verify \
@@ -74,28 +74,28 @@ runs:
         labels="$(docker inspect "${IMAGE}" | jq -c '.[0].Config.Labels')"
         echo "::add-mask::${labels}"
 
-        project_id="$(jq -r '.project_id' <<<"${labels}")"
-        echo "::add-mask::${project_id}"
-        echo "project-id=${project_id}" >> "${GITHUB_OUTPUT}"
+        hcp_project_id="$(jq -r '.hcp_project_id' <<<"${labels}")"
+        echo "::add-mask::${hcp_project_id}"
+        echo "hcp-project-id=${hcp_project_id}" >> "${GITHUB_OUTPUT}"
 
-        secrets_app="$(jq -r '.secrets_app' <<<"${labels}")"
-        echo "::add-mask::${secrets_app}"
-        echo "secrets-app=${secrets_app}" >> "${GITHUB_OUTPUT}"
+        hcp_secrets_app="$(jq -r '.hcp_secrets_app' <<<"${labels}")"
+        echo "::add-mask::${hcp_secrets_app}"
+        echo "hcp-secrets-app=${hcp_secrets_app}" >> "${GITHUB_OUTPUT}"
 
-        service_principal="$(jq -r '.service_principal' <<<"${labels}")"
-        echo "::add-mask::${service_principal}"
-        echo "service-principal=${service_principal}" >> "${GITHUB_OUTPUT}"
+        hcp_service_principal="$(jq -r '.hcp_service_principal' <<<"${labels}")"
+        echo "::add-mask::${hcp_service_principal}"
+        echo "hcp-service-principal=${hcp_service_principal}" >> "${GITHUB_OUTPUT}"
 
-        identity_provider="$(jq -r '.identity_provider' <<<"${labels}")"
-        echo "::add-mask::${identity_provider}"
-        echo "identity-provider=${identity_provider}" >> "${GITHUB_OUTPUT}"
+        hcp_identity_provider="$(jq -r '.hcp_identity_provider' <<<"${labels}")"
+        echo "::add-mask::${hcp_identity_provider}"
+        echo "hcp-identity-provider=${hcp_identity_provider}" >> "${GITHUB_OUTPUT}"
       shell: bash
 
     - name: Decrypt HCP Project ID
       id: hcp-project-id
       uses: tmknom/symmetric-encrypt-decrypt-action@f82452a36a04ec4b4215dd92d7958cdae5f9a620 # v0.1.3
       with:
-        data: ${{ steps.encrypted.outputs.project-id }}
+        data: ${{ steps.encrypted.outputs.hcp-project-id }}
         key: key-hcp-project-id-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         iv: iv-hcp-project-id-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
@@ -104,7 +104,7 @@ runs:
       id: hcp-secrets-app
       uses: tmknom/symmetric-encrypt-decrypt-action@f82452a36a04ec4b4215dd92d7958cdae5f9a620 # v0.1.3
       with:
-        data: ${{ steps.encrypted.outputs.secrets-app }}
+        data: ${{ steps.encrypted.outputs.hcp-secrets-app }}
         key: key-hcp-secrets-app-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         iv: iv-hcp-secrets-app-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
@@ -113,7 +113,7 @@ runs:
       id: hcp-service-principal
       uses: tmknom/symmetric-encrypt-decrypt-action@f82452a36a04ec4b4215dd92d7958cdae5f9a620 # v0.1.3
       with:
-        data: ${{ steps.encrypted.outputs.service-principal }}
+        data: ${{ steps.encrypted.outputs.hcp-service-principal }}
         key: key-hcp-service-principal-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         iv: iv-hcp-service-principal-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
@@ -122,7 +122,7 @@ runs:
       id: hcp-identity-provider
       uses: tmknom/symmetric-encrypt-decrypt-action@f82452a36a04ec4b4215dd92d7958cdae5f9a620 # v0.1.3
       with:
-        data: ${{ steps.encrypted.outputs.identity-provider }}
+        data: ${{ steps.encrypted.outputs.hcp-identity-provider }}
         key: key-hcp-identity-provider-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         iv: iv-hcp-identity-provider-${{ github.repository_owner_id }}-${{ github.repository_owner }}/internal-secrets
         operation: decrypt
